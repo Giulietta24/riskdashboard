@@ -69,6 +69,7 @@ def score_row(row):
     dte = get_dte(row.get("expiry", ""))
 
     risk = 0
+
     if theta <= 0:
         risk += 2
     elif theta < 0.01:
