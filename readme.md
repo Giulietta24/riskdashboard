@@ -1,27 +1,14 @@
-# Portfolio Risk Dashboard
+# Theta Income Portfolio
 
-A simple Streamlit starter for reviewing portfolio holdings and adding risk analytics.
+A Streamlit dashboard for monitoring an income-focused options portfolio.
 
-## Features
+## What it shows
 
-- Upload a CSV of holdings.
-- View market value by ticker.
-- See simple exposure breakdowns.
-- Extend it with options Greeks, stress tests, and history tracking.
-
-## CSV format
-
-Your uploaded file should include at least:
-
-- `ticker`
-- `qty`
-- `last`
-
-Optional fields:
-
-- `type`
-- `avg_price`
-- `market_value`
+- Overview metrics
+- Positions table
+- Theta, delta, gamma, and vega by underlying
+- Heatmap of theta by instrument
+- Snapshot history saved locally
 
 ## Run locally
 
@@ -30,18 +17,39 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Deploy to GitHub + Streamlit Cloud
+## Deploy to GitHub + Streamlit Community Cloud
 
 1. Create a GitHub repo.
 2. Add `app.py`, `requirements.txt`, and `README.md`.
-3. Push the repo to GitHub.
-4. Connect the repo in Streamlit Community Cloud.
-5. Set `app.py` as the main file.
+3. Push the repo.
+4. Open Streamlit Community Cloud.
+5. Select your repo and `app.py`.
+6. Deploy.
+
+## CSV columns
+
+Recommended columns:
+
+- `section`
+- `ticker`
+- `underlying`
+- `instrument`
+- `side`
+- `qty`
+- `avg_price`
+- `last`
+- `market_value`
+- `delta`
+- `gamma`
+- `theta`
+- `vega`
+- `unrealized_pnl`
+- `expiry`
+- `strike`
 
 ## Next upgrades
 
-- Add options-chain ingestion with `yfinance`.
-- Add Greeks and theta/vega summaries.
-- Add a strike-by-expiration heatmap.
-- Save daily snapshots to a `data/` folder.
-- Add alerting for concentration and margin risk.
+- Pull live options chains with yfinance.
+- Add strike-by-expiry heatmaps.
+- Add per-ticker stress tests.
+- Add alerts for large short gamma or vega exposure.
