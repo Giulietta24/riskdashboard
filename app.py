@@ -42,17 +42,9 @@ for col in ["market_value", "unrealized_pnl", "delta", "gamma", "theta", "vega",
 if "strike" in df.columns:
     df["strike"] = df["strike"].fillna(np.nan)
 
-required_defaults = {
-    "section": "",
-    "ticker": "",
-    "underlying": "",
-    "instrument": "",
-    "side": "",
-    "expiry": "",
-}
-for col, default in required_defaults.items():
+for col in ["section", "ticker", "underlying", "instrument", "side", "expiry"]:
     if col not in df.columns:
-        df[col] = default
+        df[col] = ""
 
 if "theta" not in df.columns:
     df["theta"] = 0.0
@@ -62,6 +54,114 @@ if "gamma" not in df.columns:
     df["gamma"] = 0.0
 if "delta" not in df.columns:
     df["delta"] = 0.0
+
+def action_label(row):
+    theta = row.get("theta", 0)
+    gamma = abs(row.get("gamma", 0))
+    vega = abs(row.get("vega", 0))
+    delta = abs(row.get("delta", 0))
+    dte_flag = 0
+    try:
+        if str(row.get("expiry", "")).strip():
+            expiry = pd.to_datetime(row["expiry"], errors="coerce")
+            if pd.notna(expiry):
+                dte_flag = (expiry - pd.Timestamp.now()).days
+    except Exception:
+        dte_flag = 0
+
+    risk = 0
+    if theta <= 0:
+        risk += 2
+    elif theta < 0.01:
+        risk += 1
+
+    if gamma >= 0.02:
+        risk += 2
+    elif gamma >= 0.01:
+        risk += 1
+
+    if vega >= 0.03:
+        risk += 2
+    elif vega >= 0.015:
+        risk += 1
+
+    if delta >= 0.25:
+        risk += 2
+    elif delta >= 0.10:
+        risk += 1
+
+    if dte_flag and dte_flag <= 14:
+        risk += 2
+    elif dte_flag and dte_flag <= 30:
+        risk += 1
+
+    if risk <= 2:
+        return "Hold"
+    elif risk <= 5:
+        return "Watch"
+    return "Act"
+
+df["action"] = df.apply(action_label, axis=1)
+
+def cell_color(val, metric):
+    if pd.isna(val):
+        return ""
+    if metric == "theta":
+        if val > 0.02:
+            return "background-color: #1f7a1f; color: white;"
+        if val > 0:
+            return "background-color: #7cae00; color: black;"
+        return "background-color: #8b1a1a; color: white;"
+    if metric == "delta":
+        a = abs(val)
+        if a < 0.10:
+            return "background-color: #1f7a1f; color: white;"
+        if a < 0.25:
+            return "background-color: #d9b300; color: black;"
+        return "background-color: #b22222; color: white;"
+    if metric == "gamma":
+        a = abs(val)
+        if a < 0.01:
+            return "background-color: #1f7a1f; color: white;"
+        if a < 0.02:
+            return "background-color: #d9b300; color: black;"
+        return "background-color: #b22222; color: white;"
+    if metric == "vega":
+        a = abs(val)
+        if a < 0.015:
+            return "background-color: #1f7a1f; color: white;"
+        if a < 0.03:
+            return "background-color: #d9b300; color: black;"
+        return "background-color: #b22222; color: white;"
+    if metric == "action":
+        if val == "Hold":
+            return "background-color: #1f7a1f; color: white;"
+        if val == "Watch":
+            return "background-color: #d9b300; color: black;"
+        return "background-color: #b22222; color: white;"
+    return ""
+
+def style_risk_table(frame):
+    styled = frame.copy()
+    styled = styled.style.format({
+        "qty": "{:,.0f}",
+        "avg_price": "{:.3f}",
+        "last": "{:.3f}",
+        "market_value": "{:,.0f}",
+        "delta": "{:.3f}",
+        "gamma": "{:.3f}",
+        "theta": "{:.3f}",
+        "vega": "{:.3f}",
+        "unrealized_pnl": "{:,.0f}",
+        "theta_per_vega": "{:.3f}",
+        "theta_per_gamma": "{:.3f}",
+    })
+
+    for col in ["theta", "delta", "gamma", "vega", "action"]:
+        if col in frame.columns:
+            styled = styled.applymap(lambda v, c=col: cell_color(v, c), subset=[col])
+
+    return styled
 
 st.sidebar.header("Filters")
 sections = ["All"] + sorted([x for x in df["section"].dropna().unique().tolist() if str(x).strip() != ""])
@@ -98,8 +198,8 @@ with tab1:
         st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
-    show_cols = [c for c in ["section", "ticker", "underlying", "instrument", "side", "qty", "avg_price", "last", "market_value", "delta", "gamma", "theta", "vega", "unrealized_pnl", "expiry", "strike"] if c in df.columns]
-    st.dataframe(df[show_cols], use_container_width=True)
+    show_cols = [c for c in ["section", "ticker", "underlying", "instrument", "side", "qty", "avg_price", "last", "market_value", "delta", "gamma", "theta", "vega", "unrealized_pnl", "action", "expiry", "strike"] if c in df.columns]
+    st.dataframe(style_risk_table(df[show_cols]), use_container_width=True)
 
     if "underlying" in df.columns and "market_value" in df.columns and len(df):
         mv = df.groupby("underlying", as_index=False)["market_value"].sum().sort_values("market_value", ascending=False)
@@ -121,8 +221,8 @@ with tab3:
         risk["theta_abs"] = risk["theta"].abs()
         risk["theta_per_vega"] = np.where(risk["vega"].abs() > 0, risk["theta"] / risk["vega"].abs(), np.nan)
         risk["theta_per_gamma"] = np.where(risk["gamma"].abs() > 0, risk["theta"] / risk["gamma"].abs(), np.nan)
-        risk_cols = [c for c in ["underlying", "ticker", "side", "theta", "delta", "gamma", "vega", "theta_per_vega", "theta_per_gamma", "unrealized_pnl"] if c in risk.columns]
-        st.dataframe(risk[risk_cols], use_container_width=True)
+        risk_cols = [c for c in ["underlying", "ticker", "side", "theta", "delta", "gamma", "vega", "theta_per_vega", "theta_per_gamma", "action", "unrealized_pnl"] if c in risk.columns]
+        st.dataframe(style_risk_table(risk[risk_cols]), use_container_width=True)
 
     if "underlying" in df.columns and len(df):
         theta_by_u = df.groupby("underlying", as_index=False)[["theta", "vega", "gamma", "delta"]].sum().sort_values("theta", ascending=False)
