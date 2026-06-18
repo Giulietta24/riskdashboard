@@ -5,6 +5,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
 from datetime import datetime
+from PIL import Image
+import io
 
 st.set_page_config(page_title="Theta Income Portfolio", layout="wide")
 
@@ -28,8 +30,27 @@ sample = pd.DataFrame([
     {"section": "Options", "ticker": "SG Jan'27 15C", "underlying": "SG", "instrument": "call", "side": "short", "qty": -2, "avg_price": 1.451, "last": 1.05, "market_value": -146.0, "delta": 0.336, "gamma": 0.025, "theta": -0.005, "vega": 0.025, "unrealized_pnl": -72.0, "expiry": "2027-01-15", "strike": 15},
 ])
 
-uploaded = st.sidebar.file_uploader("Upload portfolio CSV", type=["csv"])
-df = pd.read_csv(uploaded) if uploaded is not None else sample.copy()
+uploaded_file = st.sidebar.file_uploader(
+    "Upload CSV or screenshot",
+    type=["csv", "png", "jpg", "jpeg"]
+)
+
+df = sample.copy()
+
+if uploaded_file is not None:
+    file_name = uploaded_file.name.lower()
+
+    if file_name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+        st.sidebar.success("CSV loaded.")
+    elif file_name.endswith((".png", ".jpg", ".jpeg")):
+        image = Image.open(uploaded_file)
+        st.sidebar.success("Screenshot loaded.")
+        st.image(image, caption=uploaded_file.name, use_container_width=True)
+
+        st.info("Screenshot upload is supported for preview. OCR extraction can be added next.")
+    else:
+        st.sidebar.warning("Unsupported file type. Using sample data.")
 
 for col in ["market_value", "unrealized_pnl", "delta", "gamma", "theta", "vega", "qty", "last", "avg_price", "strike"]:
     if col in df.columns:
